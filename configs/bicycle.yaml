@@ -1,0 +1,138 @@
+# F1 Digital Twin - Bicycle Model Environment Configuration
+# Physics-based racing with bicycle vehicle model
+
+experiment:
+  name: "bicycle_baseline"
+  seed: 42
+  deterministic: true
+
+device:
+  type: "cpu"
+  cuda_device: 0
+  num_workers: 4
+  pin_memory: false
+
+env:
+  name: "bicycle"  # Use bicycle model instead of stub
+  max_episode_steps: 2000
+  dt: 0.02  # 50 Hz physics
+  
+  # Track selection: "oval", "figure_eight", "monza"
+  track_name: "oval"
+  
+  # Initial conditions
+  initial_speed: 20.0  # m/s
+  initial_position_noise: 0.0
+  initial_heading_noise: 0.0
+  
+  # Termination conditions
+  off_track_terminate: true
+  min_speed: 2.0
+  max_lateral_offset: 8.0
+
+state:
+  dimension: 34
+
+action:
+  dimension: 3
+  type: "continuous"
+  steering:
+    min: -1.0
+    max: 1.0
+  throttle:
+    min: 0.0
+    max: 1.0
+  brake:
+    min: 0.0
+    max: 1.0
+
+world_model:
+  enabled: false  # Disable for initial training
+
+policy:
+  algorithm: "ppo"
+  actor:
+    hidden_dims: [256, 256]
+    activation: "tanh"
+    log_std_min: -20.0
+    log_std_max: 2.0
+  critic:
+    hidden_dims: [256, 256]
+    activation: "relu"
+  ppo:
+    clip_ratio: 0.2
+    value_clip: 0.2
+    entropy_coef: 0.01
+    value_coef: 0.5
+    max_grad_norm: 0.5
+    target_kl: 0.01
+
+training:
+  total_timesteps: 1000000
+  rollout:
+    num_envs: 8
+    steps_per_env: 2048
+  update:
+    epochs: 10
+    minibatch_size: 64
+  lr_schedule:
+    type: "linear"
+    initial: 0.0003
+    final: 0.00001
+  eval:
+    frequency: 10000
+    num_episodes: 5
+    deterministic: true
+
+reward:
+  # Primary objective: forward progress
+  progress_weight: 100.0        # 100.0 = one full lap gives reward of 100.0
+  
+  # Anti-reward-hacking
+  alive_bonus: 0.02             # Small per-step bonus to discourage early termination
+  
+  # Shaping (small guidance signals)
+  speed_weight: 0.01            # Tiny bonus for going faster
+  centering_penalty: 0.1        # Stay near racing line
+  heading_penalty: 0.5          # Point in right direction
+  slip_penalty: 1.0             # Discourage sliding
+  smoothness_penalty: 0.1       # Discourage jerky inputs
+  
+  # Terminal
+  off_track_penalty: -10.0      # Large penalty for leaving track
+  
+  # Stabilization (from stabilization pass)
+  standstill_penalty: 0.05      # Discourage stopping
+  constant_brake_penalty: 0.02  # Discourage always-brake
+  excessive_yaw_penalty: 0.1    # Discourage spinning
+  low_speed_brake_penalty: 0.1  # Discourage braking while slow
+  
+  # Smooth driving
+  aligned_speed_bonus: 0.005    # Bonus for speed when heading is aligned
+  steering_smoothness: 0.02     # Penalty for steering changes
+  
+  scale: 1.0
+  clip: 10.0
+
+logging:
+  level: "INFO"
+  log_frequency: 100
+  metrics:
+    - episode_return
+    - episode_length
+    - lap_time
+    - policy_loss
+    - value_loss
+    - entropy
+    - kl_divergence
+    - explained_variance
+    - velocity
+    - lateral_offset
+    - slip_angle
+  tensorboard:
+    enabled: true
+    log_histograms: false
+  checkpoint:
+    frequency: 50000
+    keep_last: 5
+    save_best: true
