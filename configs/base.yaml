@@ -1,0 +1,144 @@
+# F1 Digital Twin - Base Configuration
+# All parameters that control system behavior
+
+experiment:
+  name: "baseline"
+  seed: 42
+  deterministic: true
+
+device:
+  type: "cpu"  # "cpu" or "cuda"
+  cuda_device: 0
+  num_workers: 4
+  pin_memory: false
+
+env:
+  name: "stub"  # "stub", "assetto", "rfactor"
+  max_episode_steps: 2000
+  action_repeat: 4
+  track:
+    name: "monza"
+    length_km: 5.793
+  normalize_obs: true
+  normalize_reward: true
+  clip_obs: 10.0
+  clip_reward: 10.0
+
+state:
+  dimension: 34
+  include:
+    - velocity
+    - acceleration
+    - angular_velocity
+    - steering_angle
+    - throttle
+    - brake
+    - tire_temps
+    - tire_wear
+    - fuel_mass
+    - track_position
+    - lateral_offset
+    - heading_error
+    - curvature_ahead
+
+action:
+  dimension: 3
+  type: "continuous"
+  steering:
+    min: -1.0
+    max: 1.0
+  throttle:
+    min: 0.0
+    max: 1.0
+  brake:
+    min: 0.0
+    max: 1.0
+
+world_model:
+  enabled: true
+  architecture: "mlp"
+  encoder:
+    hidden_dims: [256, 256]
+    latent_dim: 64
+    activation: "elu"
+  dynamics:
+    hidden_dims: [256, 256]
+    activation: "elu"
+  horizon: 16
+  learning_rate: 0.0003
+  batch_size: 256
+  gradient_clip: 1.0
+
+policy:
+  algorithm: "ppo"
+  actor:
+    hidden_dims: [256, 256]
+    activation: "tanh"
+    log_std_min: -20.0
+    log_std_max: 2.0
+  critic:
+    hidden_dims: [256, 256]
+    activation: "relu"
+  ppo:
+    clip_ratio: 0.2
+    value_clip: 0.2
+    entropy_coef: 0.01
+    value_coef: 0.5
+    max_grad_norm: 0.5
+    target_kl: 0.01
+
+training:
+  total_timesteps: 1000000
+  rollout:
+    num_envs: 8
+    steps_per_env: 2048
+  update:
+    epochs: 10
+    minibatch_size: 64
+  lr_schedule:
+    type: "linear"
+    initial: 0.0003
+    final: 0.00001
+  eval:
+    frequency: 10000
+    num_episodes: 5
+    deterministic: true
+
+reward:
+  progress_weight: 1.0
+  speed_weight: 0.1
+  off_track_penalty: -10.0
+  collision_penalty: -100.0
+  smoothness_penalty: 0.1
+  tire_preservation_weight: 0.05
+  fuel_efficiency_weight: 0.01
+  scale: 1.0
+  clip: 10.0
+
+logging:
+  level: "INFO"
+  log_frequency: 100
+  metrics:
+    - episode_return
+    - episode_length
+    - lap_time
+    - policy_loss
+    - value_loss
+    - entropy
+    - kl_divergence
+    - explained_variance
+  tensorboard:
+    enabled: true
+    log_histograms: false
+  checkpoint:
+    frequency: 50000
+    keep_last: 5
+    save_best: true
+
+analysis:
+  trace_decisions: true
+  trace_frequency: 1000
+  trace_components:
+    - action_distribution
+    - value_estimate
+    - state_encoding
